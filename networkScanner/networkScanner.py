@@ -76,8 +76,8 @@ def extractIPAddressFromString(string):
 def getMacAddresssInfo(mac):
     url = f"https://api.maclookup.app/v2/macs/{mac}"
     jsonData = getRequestData(url)
-    company = jsonData["company"]
-    country = jsonData["country"]
+    company = "Unknown" if jsonData["company"] == "" else jsonData["company"]
+    country = "Unknown" if jsonData["country"] == "" else jsonData["country"]
     return f"{company}({country})"
 
 def addInfoIntoResult(filename, fileContent):
@@ -139,17 +139,20 @@ def scanNetwork(ipRange):
             print(f"\nSaved scan result for {ipRange} into {filename}")
             print(f"Full path: {filepath}")
         else:
-            print(f"Could not get content from {filepath}")
-            exit()
+            print(f"Could not update the data from {filepath}")
 
 def main():
     banner()
     while (True):
+        print("You can quit the program by inserting 'exit' and press the 'enter' button")
         ip = input("Please enter the IP range to scan: ")
+        if ip == "exit":
+            print("Exiting program...\n")
+            exit()
         ipValid = isIPValid(ip)
         if ipValid:
             scanNetwork(ip)
-            break
+            exit()
         else:
             print("Invalid IP address range, please try again")
             print("Example of valid address are, 192.158.0.125/24\n")
