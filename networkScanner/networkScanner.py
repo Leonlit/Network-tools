@@ -159,7 +159,8 @@ def main():
             exit()
         else:
             print("Invalid IP address range, please try again")
-            print("Example of valid address are, 192.158.0.125/24\n")
+            print("Example of valid address are, 192.158.0.0/24\n")
+            print("Make sure the you begin the ip range from the first host (0)")
             continue
 
 if __name__ == "__main__":
