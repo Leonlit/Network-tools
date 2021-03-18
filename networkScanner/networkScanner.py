@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import scapy.all as scapy
-import ipaddress, os, sys, re, requests
+import os, sys, re, requests
 from time import sleep as sleep
 
 '''
@@ -44,11 +44,25 @@ def banner():
     print("")
 
 
-def isIPValid (ip):
+def extractMacAddressesFromString(string):
     try:
-        ipaddress.ip_network(ip)
+        pattern = re.compile(r'(?:[0-9a-fA-F]:?){12}')
+        return re.findall(pattern, string)[0]
+    except Exception as ex:
+        return False # means not a mac address
+
+def extractIPAddressFromString(string):
+    return re.findall( r'[0-9]+(?:\.[0-9]+){3}', string)[0]
+
+def isIPRangeValid (ip):
+    try:
+        ipPart = ip.split("/")
+        if 1 > int(ipPart[1]) > 32:
+            return False
+        if extractIPAddressFromString(ipPart[0]) == "":
+            return False
         return True
-    except ValueError:
+    except Exception:
         return False
 
 def getRequestData(url):
@@ -62,16 +76,6 @@ def getRequestData(url):
             print(f"Warning: Request returned request code: {statsCode}")
     except requests.exceptions.HTTPError as e:
         print(f"Error when requesting data from API server for url {url}. {str(e)}")
-
-def extractMacAddressesFromString(string):
-    try:
-        pattern = re.compile(r'(?:[0-9a-fA-F]:?){12}')
-        return re.findall(pattern, string)[0]
-    except Exception as ex:
-        return False # means not a mac address
-
-def extractIPAddressFromString(string):
-    return re.findall( r'[0-9]+(?:\.[0-9]+){3}', string)[0]
 
 def getMacAddresssInfo(mac):
     url = f"https://api.maclookup.app/v2/macs/{mac}"
@@ -136,7 +140,7 @@ def scanNetwork(ipRange):
             for line in updatedContent:
                 print(line)
             print(f"Updated content for {filename} with additional MAC address info")
-            print(f"\nSaved scan result for {ipRange} into {filename}")
+            print(f"\nSaved scan result for {ipRange} into {filename}\n")
             print(f"Full path: {filepath}")
         else:
             print(f"Could not update the data from {filepath}")
@@ -149,7 +153,7 @@ def main():
         if ip == "exit":
             print("Exiting program...\n")
             exit()
-        ipValid = isIPValid(ip)
+        ipValid = isIPRangeValid(ip)
         if ipValid:
             scanNetwork(ip)
             exit()
