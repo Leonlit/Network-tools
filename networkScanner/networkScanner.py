@@ -3,7 +3,7 @@
 
 import scapy.all as scapy
 import os, sys, re, requests
-from time import sleep as sleep
+from time import sleep
 
 '''
 Copyright © 2021 LeonLit
