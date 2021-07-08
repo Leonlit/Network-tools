@@ -1,9 +1,10 @@
-import socket, io, re, concurrent.futures,sys,os
+import socket, re, concurrent.futures, sys, os, time
 
 ''' todo 
-    - finding blocked/filtered port
-    - find the service that's for that port
-    - save result into file
+    - finding blocked/filtered port 
+    - find the service that's for that port [x]
+    - save result into file [x]
+    - get OS detail
 
 '''
 
@@ -24,10 +25,11 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 '''
 
-ip_regex = re.compile("^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
-port_regex = re.compile("([0-9]+)-([0-9]+)")
-portLimits = [0, 65535]
+IP_REGEX = re.compile("^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
+PORT_REGEX = re.compile("([0-9]+)-([0-9]+)")
+PORT_LIMITS = [0, 65535]
 target_ip = ""
+RESULT_DIRECTORY = "results"
 
 def banner():
     print("")
@@ -50,14 +52,17 @@ def banner():
     print("You can quit the program by inserting 'exit' and press the 'ctrl + c' button to interupt the program")
     print("")
 
+# checks for valid IP address
 def is_ip_valid(ip):
-    valid = ip_regex.search(ip)
+    valid = IP_REGEX.search(ip)
     return valid
 
+# checks for the port number range 
 def is_port_valid(port):
-    valid = port_regex.search(port)
+    valid = PORT_REGEX.search(port)
     return valid
 
+# return the target ip to scan, in string form
 def get_ip_address():
     while True:
         ip = input("Please enter an IP to scan its open ports: ")
@@ -71,39 +76,51 @@ def get_ip_address():
         print("Invalid IP address, please try again")
         print("Example of valid address are, 192.158.0.0\n")
 
+# return - port range in array
+#           0 - minimum port number
+#           1 - maximum port number to scan (plus 1 as later on I'll use the range function for loops)
 def get_port_range():
     while True:
-        print("Please enter the range of ports you want to scan in separated by dash, 1000-1200 (Between " + str(portLimits[0]) + " and " + str(portLimits[1]) + ")")
+        print("Please enter the range of ports you want to scan in separated by dash, 1000-1200 (Between " + str(PORT_LIMITS[0]) + " and " + str(PORT_LIMITS[1]) + ")")
         ports = input("Enter the port range that you want to scan: ")
-        ports_valid = port_regex.search(ports.replace(" ",""))
+        ports_valid = PORT_REGEX.search(ports.replace(" ",""))
         if ports_valid:
             return [int(ports_valid.group(1)), int(ports_valid.group(2)) + 1]
         print("Invalid port range, please try again!")
 
+# return - port range in array
+#           0 - minimum port number
+#           1 - maximum port number to scan (plus 1 as later on I'll use the range function for loops)
 def get_max_port():
     while True:
-        print("Please enter the port that you want the program to scan to from 0 (zero), example: 22 (max is " + str(portLimits[1]) + ")")
+        print("Please enter the port that you want the program to scan to from 0 (zero), example: 22 (max is " + str(PORT_LIMITS[1]) + ")")
         ports = input("Enter the port to scan until: ")
         ports = ports.replace(" ","")
         if ports is not "" and isinstance(int(ports), int):
             ports = int(ports)
-            ports_valid = int(ports) in range(portLimits[0], portLimits[1] + 1)
+            ports_valid = int(ports) in range(PORT_LIMITS[0], PORT_LIMITS[1] + 1)
             if ports_valid:
                 return [0, int(ports) + 1]
             print("Invalid port number, please try again!")
 
+# return - port range in array
+#           0 - minimum port number
+#           1 - maximum port number to scan (plus 1 as later on I'll use the range function for loops)
 def get_single_port():
     while True:
-        print("Please enter a single port that you want the program to scan (inclusion), example: 22 (choose between " + str(portLimits[0]) + " is " + str(portLimits[1]) + ")")
+        print("Please enter a single port that you want the program to scan (inclusion), example: 22 (choose between " + str(PORT_LIMITS[0]) + " is " + str(PORT_LIMITS[1]) + ")")
         port = input("Enter the port that you want to scan: ")
         port = port.replace(" ", "")
         if port is not "" and isinstance(int(port), int):
             port = int(port)
-            port_valid = int(port) in range(portLimits[0], portLimits[1])
+            port_valid = int(port) in range(PORT_LIMITS[0], PORT_LIMITS[1])
             if port_valid:
                 return [int(port), int(port) + 1]
         print("Invalid port number, please try again!")
 
+# return - port range in array
+#           0 - minimum port number
+#           1 - maximum port number to scan (plus 1 as later on I'll use the range function for loops)
 def get_ports():
     while True:
         print("Please choose an option for the type of port to be scanned")
@@ -124,27 +141,84 @@ def get_ports():
                     return get_single_port()
         print("Invalid option, please try again!")
 
+# port - port number in integer form
+# return: array
+#            0 - boolean, if the port is open can be connected or not
+#            1 - port, integer number of port
+#            2 - serv, service name of the port is providing
 def connect_port(port):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(0.6)
-            s.connect((target_ip, port))
-            return [True, port]
+            s.connect((target_ip, port))    # targe_ip is a global variable
+            serv = socket.getservbyport(port, "tcp")
+            return [True, port, serv]
     except:
         return [False, port]
 
-def print_open_ports (status):
-    if status[0] is True:
-        print("The port " + str(status[1]) + " is open")
+def make_directory(directory):
+    isExists = os.path.isdir(directory)
+    try:
+        if not isExists:
+            print("Result directory not found, creating one using the configuration set (upper part of the file)")
+            os.mkdir(directory)
+        return True
+    except Exception as ex:
+        print("Error! Can't create directory to save results!")
+        if hasattr(ex, 'message'):
+            print(ex.message)
+        else:
+            print(ex)
+    return False
 
+
+# ip - string value of ip
+# items - array
+#           0 - port number
+#           1 - service name
+def save_result(ip, items):
+    directory = os.path.join(os.getcwd(), RESULT_DIRECTORY)
+    print(directory)
+    directoryExists = make_directory(directory)
+    if directoryExists:
+        fileName = os.path.join(directory, ip + ".txt")
+        print(fileName)
+        try:
+            with open(fileName, "w+") as file:
+                file.write("Scan result for IP: " + ip + "\n")
+                file.write(time.ctime() + "\n")
+                for index, [port, service] in enumerate(items):
+                    file.write(str(index + 1) + ". \t" + str(port) + "\t(" + service + ")" +"\n")
+                file.close()
+        except Exception as ex:
+            print("Failed to write results into file specified")
+            if hasattr(ex, 'message'):
+                print(ex.message)
+            else:
+                print(ex)
+
+
+# ip - ip in string form
+# ports - port range <integer>-<integer>
 def scan_ports(ip, ports):
     global target_ip
     target_ip = ip
-    # portStatus = []
+    openPorts = []
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        for result in executor.map(connect_port, range(ports[0], ports[1])):
-            print_open_ports(result)
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            for result in executor.map(connect_port, range(ports[0], ports[1])):
+                if result[0] is True:
+                    print("The port " + str(result[1]) + " is open (" + str(result[2]) + ")")
+                    openPorts.append([result[1], result[2]])
+    except Exception as ex:
+        print("Can't scan the ports using socket")
+        if hasattr(ex, 'message'):
+            print(ex.message)
+        else:
+            print(ex)
+    
+    save_result(ip, openPorts)
 
 def main():
     banner()
