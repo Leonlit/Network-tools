@@ -1,4 +1,4 @@
-import socket, re, concurrent.futures, sys, os, time
+import socket, re, concurrent.futures, sys, os, time, struct
 
 ''' todo 
     - finding blocked/filtered port [x]
@@ -150,18 +150,22 @@ def connect_port(port):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(0.6)
-            s.connect((target_ip, port))    # targe_ip is a global variable
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1,0))
+            result = s.connect_ex((target_ip, port))    # targe_ip is a global variable
             serv = socket.getservbyport(port, "tcp")
-            return [True, port, serv]
-    except socket.timeout:
-        serv = ""
-        try:
+            if result == 0:
+                return [True, port, serv]
+            elif result == 110:
+                return [2, port, serv]
+            elif result == 111:
+                return [3, port, serv]
+    except Exception as e:
+        if type(e) == socket.timeout:
             serv = socket.getservbyport(port, "tcp")
-        except:
-            return [False]
-        return [None, port, serv]
-    except:
-        return [False]
+            return [2, port, serv]
+        else:
+            print("Error Occured when connecting to port using socket!")
+    return [False]
     
 
 def make_directory(directory):
@@ -227,12 +231,14 @@ def scan_ports(ip, ports):
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
             for result in executor.map(connect_port, range(ports[0], ports[1])):
+                print(result[0])
                 if result[0] is True:
                     print("The port " + str(result[1]) + " is open (" + str(result[2]) + ")")
                     openPorts.append([result[1], result[2]])
-                elif result[0] is None:
+                elif result[0] == 2:
+                    print("The port " + str(result[1]) + " is closed (" + str(result[2]) + ")")
+                elif result[0] == 3:
                     print("The port " + str(result[1]) + " is filtered (" + str(result[2]) + ")")
-                    filteredPorts.append([result[1], result[2]])
         save_result(ip, openPorts, filteredPorts, ports, (time.time() - start_time))
     except Exception as ex:
         print("Can't scan the ports using socket")
