@@ -153,18 +153,24 @@ def connect_port(port):
             s.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1,0))
             result = s.connect_ex((target_ip, port))    # targe_ip is a global variable
             serv = socket.getservbyport(port, "tcp")
+            print(result)
             if result == 0:
                 return [True, port, serv]
             elif result == 110:
                 return [2, port, serv]
             elif result == 111:
                 return [3, port, serv]
+            elif result == 10035:
+                return [False]
     except Exception as e:
-        if type(e) == socket.timeout:
-            serv = socket.getservbyport(port, "tcp")
-            return [2, port, serv]
-        else:
-            print("Error Occured when connecting to port using socket!")
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.settimeout(0.6)
+                serv = socket.getservbyport(port, "udp") 
+                s.sendto(bytes("hello", "ascii"), (target_ip, port))
+                return [True, port, serv]
+        except Exception as ex:
+            pass
     return [False]
     
 
@@ -193,13 +199,14 @@ def save_result(ip, opens, filtered, scanRange, timeTaken):
     print(directory)
     directoryExists = make_directory(directory)
     if directoryExists:
-        fileName = os.path.join(directory, ip + ".txt")
+        range = str(scanRange[0]) + "-" + str(scanRange[1])
+        fileName = os.path.join(directory, ip + range + ".txt")
         print(fileName)
         try:
             with open(fileName, "w+") as file:
-                file.write("Scan result for IP: " + ip + "\n")
+                file.write("Scan result for IP: " + ip +"\n")
                 file.write("Time of scan: " + time.ctime() + "\n")
-                file.write("Scan Range: " + str(scanRange[0]) + " - " + str(scanRange[1]) + "\n")
+                file.write("Scan Range: " + range + "\n")
                 file.write(f"Time taken: {timeTaken:.2f}")
                 file.write("\n\nOpen ports:\n")
                 for index, [port, service] in enumerate(opens):
@@ -208,7 +215,6 @@ def save_result(ip, opens, filtered, scanRange, timeTaken):
                     file.write("\n\nFiltered ports:\n")
                     for index, [port, service] in enumerate(filtered):
                         file.write(str(index + 1) + ". \t" + str(port) + "\t(" + service + ")" +"\n")
-
                 
                 file.close()
         except Exception as ex:
