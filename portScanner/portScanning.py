@@ -1,7 +1,7 @@
 import socket, re, concurrent.futures, sys, os, time
 
 ''' todo 
-    - finding blocked/filtered port 
+    - finding blocked/filtered port [x]
     - find the service that's for that port [x]
     - save result into file [x]
     - get OS detail
@@ -96,7 +96,7 @@ def get_max_port():
         print("Please enter the port that you want the program to scan to from 0 (zero), example: 22 (max is " + str(PORT_LIMITS[1]) + ")")
         ports = input("Enter the port to scan until: ")
         ports = ports.replace(" ","")
-        if ports is not "" and isinstance(int(ports), int):
+        if ports != "" and isinstance(int(ports), int):
             ports = int(ports)
             ports_valid = int(ports) in range(PORT_LIMITS[0], PORT_LIMITS[1] + 1)
             if ports_valid:
@@ -111,7 +111,7 @@ def get_single_port():
         print("Please enter a single port that you want the program to scan (inclusion), example: 22 (choose between " + str(PORT_LIMITS[0]) + " is " + str(PORT_LIMITS[1]) + ")")
         port = input("Enter the port that you want to scan: ")
         port = port.replace(" ", "")
-        if port is not "" and isinstance(int(port), int):
+        if port !="" and isinstance(int(port), int):
             port = int(port)
             port_valid = int(port) in range(PORT_LIMITS[0], PORT_LIMITS[1])
             if port_valid:
@@ -130,7 +130,7 @@ def get_ports():
         print("")
         option = input ("Please choose one of them: ")
         option = option.replace(" ", "")
-        if option is not "" and isinstance(int(option), int):
+        if option !="" and isinstance(int(option), int):
             option = int(option)
             if (0 < int(option) < 4):
                 if option == 1:
@@ -153,8 +153,16 @@ def connect_port(port):
             s.connect((target_ip, port))    # targe_ip is a global variable
             serv = socket.getservbyport(port, "tcp")
             return [True, port, serv]
+    except socket.timeout:
+        serv = ""
+        try:
+            serv = socket.getservbyport(port, "tcp")
+        except:
+            return [False]
+        return [None, port, serv]
     except:
-        return [False, port]
+        return [False]
+    
 
 def make_directory(directory):
     isExists = os.path.isdir(directory)
@@ -176,7 +184,7 @@ def make_directory(directory):
 # items - array
 #           0 - port number
 #           1 - service name
-def save_result(ip, items):
+def save_result(ip, opens, filtered, scanRange, timeTaken):
     directory = os.path.join(os.getcwd(), RESULT_DIRECTORY)
     print(directory)
     directoryExists = make_directory(directory)
@@ -186,9 +194,18 @@ def save_result(ip, items):
         try:
             with open(fileName, "w+") as file:
                 file.write("Scan result for IP: " + ip + "\n")
-                file.write(time.ctime() + "\n")
-                for index, [port, service] in enumerate(items):
+                file.write("Time of scan: " + time.ctime() + "\n")
+                file.write("Scan Range: " + str(scanRange[0]) + " - " + str(scanRange[1]) + "\n")
+                file.write(f"Time taken: {timeTaken:.2f}")
+                file.write("\n\nOpen ports:\n")
+                for index, [port, service] in enumerate(opens):
                     file.write(str(index + 1) + ". \t" + str(port) + "\t(" + service + ")" +"\n")
+                if len(filtered) != 0:
+                    file.write("\n\nFiltered ports:\n")
+                    for index, [port, service] in enumerate(filtered):
+                        file.write(str(index + 1) + ". \t" + str(port) + "\t(" + service + ")" +"\n")
+
+                
                 file.close()
         except Exception as ex:
             print("Failed to write results into file specified")
@@ -199,18 +216,24 @@ def save_result(ip, items):
 
 
 # ip - ip in string form
-# ports - port range <integer>-<integer>
+# ports - port range in array: [min, max]
 def scan_ports(ip, ports):
     global target_ip
     target_ip = ip
     openPorts = []
+    filteredPorts = []
 
+    start_time = time.time()
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
             for result in executor.map(connect_port, range(ports[0], ports[1])):
                 if result[0] is True:
                     print("The port " + str(result[1]) + " is open (" + str(result[2]) + ")")
                     openPorts.append([result[1], result[2]])
+                elif result[0] is None:
+                    print("The port " + str(result[1]) + " is filtered (" + str(result[2]) + ")")
+                    filteredPorts.append([result[1], result[2]])
+        save_result(ip, openPorts, filteredPorts, ports, (time.time() - start_time))
     except Exception as ex:
         print("Can't scan the ports using socket")
         if hasattr(ex, 'message'):
@@ -218,7 +241,6 @@ def scan_ports(ip, ports):
         else:
             print(ex)
     
-    save_result(ip, openPorts)
 
 def main():
     banner()
