@@ -1,15 +1,16 @@
-import socket, re, concurrent.futures, sys, os, time
+import socket, re, concurrent.futures, sys, os, time, subprocess, platform
 from datetime import datetime, timedelta
-from scapy.all import sr1, IP, ICMP, TCP, RandShort
+from scapy.all import sr1, IP, TCP, RandShort
 
 ''' todo 
     - finding blocked/filtered port [x]
     - find the service that's for that port [x]
     - save result into file [x]
     - get OS detail
-    - check if the machine is reachable
-    - support scan for common ports in get port options
-    - print result file content after finish
+    - check if the machine is reachable [x]
+    - support scan for common ports in get port options [x]
+    - print result file content after finish [x]
+    - refactor
 
 '''
 
@@ -67,6 +68,27 @@ def is_port_valid(port):
     valid = PORT_REGEX.search(port)
     return valid
 
+# used to check if the machine is online or not using ping
+def device_online(ip):
+    param = '-n' if platform.system().lower()=='windows' else '-c'
+    command = ['ping', param, '1', "-4" , ip]
+    try:
+        result = subprocess.call(
+            command,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.STDOUT
+        )
+
+    except Exception:
+        print(f"Could not PING {ip}")
+        return False
+    if (result == 0):
+        print(f"\nPing operation for [{ip}] is sucessful, target is online")
+    else:
+        print(f"\nPing operation failed, the target might be offline or rejected connection from your device")
+        print("Or there's no device that's using this IP address currently")
+    return result == 0
+
 # return the target ip to scan, in string form
 def get_ip_address():
     while True:
@@ -77,6 +99,7 @@ def get_ip_address():
         ip = ip.replace(" ", "")
         ipValid = is_ip_valid(ip)
         if ipValid:
+            device_online(ip)
             return ip
         print("Invalid IP address, please try again")
         print("Example of valid address are, 192.158.0.0\n")
@@ -131,22 +154,25 @@ def get_single_port():
 #           1 - maximum port number to scan (plus 1 as later on I'll use the range function for loops)
 def get_ports():
     while True:
-        print("Please choose an option for the type of port to be scanned")
+        print("\nPlease choose an option for the type of port to be scanned")
         print(" 1. Port range")
         print(" 2. Enter one port and scan from 0 to it")
         print(" 3. Scan single port")
+        print(" 4. Scan common ports (0 - 1023 ports)")
         print("")
         option = input ("Please choose one of them: ")
         option = option.replace(" ", "")
         if option !="" and isinstance(int(option), int):
             option = int(option)
-            if (0 < int(option) < 4):
+            if (0 < int(option) < 5):
                 if option == 1:
                     return get_port_range()
                 elif option == 2:
                     return get_max_port()
-                else:
+                elif option == 3:
                     return get_single_port()
+                elif option == 4:
+                    return [0, 1024]
         print("Invalid option, please try again!")
 
 # port - port number in integer form
@@ -164,8 +190,6 @@ def connect_port(port):
                     return [False]
                 elif pkt[TCP].flags == 18: # port open
                     return [2, port, serv]
-            elif pkt.haslayer(ICMP):
-                return [4, port]
             else: # unknown response
                 print(pkt.summary()) 
                 return [False]
@@ -199,8 +223,14 @@ def formatTime(time):
     separated[1] = separated[1][:4]
     return ".".join(separated)
 
+
+def display_result(fileName):
+    print("\n\n")
+    with open(fileName) as file:
+        print(file.read())
+
 # ip - string value of ip
-# opens, filtered, icmp:
+# opens, filtered:
 #       - array
 #           0 - port number
 #           1 - service name
@@ -211,9 +241,8 @@ def formatTime(time):
 # startTime - start time of the operations
 # timeTaken - time taken by the operations
 
-def save_result(ip, opens, filtered, icmp, scanRange, startTime, timeTaken):
+def save_result(ip, opens, filtered, scanRange, startTime, timeTaken):
     directory = os.path.join(os.getcwd(), RESULT_DIRECTORY)
-    print(directory)
     directoryExists = make_directory(directory)
     if directoryExists:
         range = str(scanRange[0]) + "-" + str(scanRange[1] - 1)
@@ -223,30 +252,29 @@ def save_result(ip, opens, filtered, icmp, scanRange, startTime, timeTaken):
         timeTakenFormatted = formatTime(str(timedelta(seconds=timeTaken)))
         startTimeFormatted = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.localtime(startTime))
         fileName = os.path.join(directory, f"{ip}_{range}_{str(startTimeFormatted[:10])}.txt")
-        print(fileName)
-        
         try:
             with open(fileName, "w+") as file:
                 file.write("Scan result for IP: " + ip +"\n")
                 file.write("Time of scan: " + startTimeFormatted + "\n")
                 file.write("Scan Range: " + range + "\n")
                 file.write(f"Time taken: {timeTakenFormatted}")
-                file.write("\n\nOpen ports:\n")
+                file.write(f"Number of available ports: ({len(opens) + len(filtered)})")
+                if len(opens) == len(filtered) == 0:
+                    file.write("\n Nothing to be shown\n")
 
-                for index, [port, service] in enumerate(opens):
-                    file.write(str(index + 1) + ". \t" + str(port) + "\t(" + service + ")" +"\n")
+                if len(opens) != 0:
+                    file.write("\n\nOpen ports:\n")
+                    for index, [port, service] in enumerate(opens):
+                        file.write(str(index + 1) + ". \t" + str(port) + "\t(" + service + ")" +"\n")
                 
                 if len(filtered) != 0:
                     file.write("\n\nFiltered ports:\n")
                     for index, [port, service] in enumerate(filtered):
                         file.write(str(index + 1) + ". \t" + str(port) + "\t(" + service + ")" +"\n")
-                
-                if len(icmp) != 0:
-                    file.write("\n\nICMP responded:\n")
-                    for index, [port, service] in enumerate(icmp):
-                        file.write(str(index + 1) + ". \t" + str(port) + "\t(" + service + ")" +"\n")
 
                 file.close()
+                print(f"Saved scan result into {fileName}")
+                display_result(fileName)
         except Exception as ex:
             print("Failed to write results into file specified")
             if hasattr(ex, 'message'):
@@ -262,7 +290,6 @@ def scan_ports(ip, ports):
     target_ip = ip
     openPorts = []
     filteredPorts = []
-    icmpResponse = []
 
     start_time = time.time()
     try:
@@ -276,10 +303,8 @@ def scan_ports(ip, ports):
                 elif flag == 3:
                     print(f"[{timestamp}] -> Port {str(result[1])} is filtered ({str(result[2])})")
                     filteredPorts.append([result[1], result[2]])
-                elif flag == 4:
-                    print(f"[{timestamp}] -> ICMP packet responded or filtered")
-                    icmpResponse.append(result[1])
-        save_result(ip, openPorts, filteredPorts, icmpResponse, ports, start_time, (time.time() - start_time))
+        
+        save_result(ip, openPorts, filteredPorts, ports, start_time, (time.time() - start_time))
     except Exception as ex:
         print("Can't scan the port using scapy")
         if hasattr(ex, 'message'):
