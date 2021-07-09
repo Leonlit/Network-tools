@@ -1,10 +1,15 @@
-import socket, re, concurrent.futures, sys, os, time, struct
+import socket, re, concurrent.futures, sys, os, time
+from datetime import datetime, timedelta
+from scapy.all import sr1, IP, ICMP, TCP, RandShort
 
 ''' todo 
     - finding blocked/filtered port [x]
     - find the service that's for that port [x]
     - save result into file [x]
     - get OS detail
+    - check if the machine is reachable
+    - support scan for common ports in get port options
+    - print result file content after finish
 
 '''
 
@@ -85,6 +90,9 @@ def get_port_range():
         ports = input("Enter the port range that you want to scan: ")
         ports_valid = PORT_REGEX.search(ports.replace(" ",""))
         if ports_valid:
+            portRange = ports.split("-")
+            if portRange[0] > portRange[1]:
+                print("The minimum port can't be higher than maximum port number!")
             return [int(ports_valid.group(1)), int(ports_valid.group(2)) + 1]
         print("Invalid port range, please try again!")
 
@@ -148,32 +156,29 @@ def get_ports():
 #            2 - serv, service name of the port is providing
 def connect_port(port):
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(0.6)
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1,0))
-            result = s.connect_ex((target_ip, port))    # targe_ip is a global variable
-            serv = socket.getservbyport(port, "tcp")
-            print(result)
-            if result == 0:
-                return [True, port, serv]
-            elif result == 110:
-                return [2, port, serv]
-            elif result == 111:
-                return [3, port, serv]
-            elif result == 10035:
+        pkt = sr1(IP(dst=target_ip)/TCP(sport=RandShort(), dport=port, flags="S"), timeout=1, verbose=0)
+        if pkt != None:
+            if pkt.haslayer(TCP):
+                serv = socket.getservbyport(port, "tcp")
+                if pkt[TCP].flags == 20:    # port closed
+                    return [False]
+                elif pkt[TCP].flags == 18: # port open
+                    return [2, port, serv]
+            elif pkt.haslayer(ICMP):
+                return [4, port]
+            else: # unknown response
+                print(pkt.summary()) 
                 return [False]
-    except Exception as e:
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-                s.settimeout(0.6)
-                serv = socket.getservbyport(port, "udp") 
-                s.sendto(bytes("hello", "ascii"), (target_ip, port))
-                return [True, port, serv]
-        except Exception as ex:
-            pass
-    return [False]
-    
+        else:
+            serv = socket.getservbyport(port, "tcp")
+            return [3, port, serv]
+    except:
+        return [False]
 
+# making sure that the result directory exists
+# return true or false to indicate the directory existence 
+# parameter:
+#           directory = path to the directory
 def make_directory(directory):
     isExists = os.path.isdir(directory)
     try:
@@ -189,33 +194,58 @@ def make_directory(directory):
             print(ex)
     return False
 
+def formatTime(time):
+    separated = time.split(".")
+    separated[1] = separated[1][:4]
+    return ".".join(separated)
 
 # ip - string value of ip
-# items - array
+# opens, filtered, icmp:
+#       - array
 #           0 - port number
 #           1 - service name
-def save_result(ip, opens, filtered, scanRange, timeTaken):
+# scanRange 
+#       - integer array
+#           0 - min range
+#           1 - max range
+# startTime - start time of the operations
+# timeTaken - time taken by the operations
+
+def save_result(ip, opens, filtered, icmp, scanRange, startTime, timeTaken):
     directory = os.path.join(os.getcwd(), RESULT_DIRECTORY)
     print(directory)
     directoryExists = make_directory(directory)
     if directoryExists:
-        range = str(scanRange[0]) + "-" + str(scanRange[1])
-        fileName = os.path.join(directory, ip + range + ".txt")
+        range = str(scanRange[0]) + "-" + str(scanRange[1] - 1)
+        if abs(scanRange[1] - scanRange[0]) == 1:
+            range = scanRange[0]
+        
+        timeTakenFormatted = formatTime(str(timedelta(seconds=timeTaken)))
+        startTimeFormatted = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.localtime(startTime))
+        fileName = os.path.join(directory, f"{ip}_{range}_{str(startTimeFormatted[:10])}.txt")
         print(fileName)
+        
         try:
             with open(fileName, "w+") as file:
                 file.write("Scan result for IP: " + ip +"\n")
-                file.write("Time of scan: " + time.ctime() + "\n")
+                file.write("Time of scan: " + startTimeFormatted + "\n")
                 file.write("Scan Range: " + range + "\n")
-                file.write(f"Time taken: {timeTaken:.2f}")
+                file.write(f"Time taken: {timeTakenFormatted}")
                 file.write("\n\nOpen ports:\n")
+
                 for index, [port, service] in enumerate(opens):
                     file.write(str(index + 1) + ". \t" + str(port) + "\t(" + service + ")" +"\n")
+                
                 if len(filtered) != 0:
                     file.write("\n\nFiltered ports:\n")
                     for index, [port, service] in enumerate(filtered):
                         file.write(str(index + 1) + ". \t" + str(port) + "\t(" + service + ")" +"\n")
                 
+                if len(icmp) != 0:
+                    file.write("\n\nICMP responded:\n")
+                    for index, [port, service] in enumerate(icmp):
+                        file.write(str(index + 1) + ". \t" + str(port) + "\t(" + service + ")" +"\n")
+
                 file.close()
         except Exception as ex:
             print("Failed to write results into file specified")
@@ -232,22 +262,26 @@ def scan_ports(ip, ports):
     target_ip = ip
     openPorts = []
     filteredPorts = []
+    icmpResponse = []
 
     start_time = time.time()
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
             for result in executor.map(connect_port, range(ports[0], ports[1])):
-                print(result[0])
-                if result[0] is True:
-                    print("The port " + str(result[1]) + " is open (" + str(result[2]) + ")")
+                flag = result[0]
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                if flag == 2:
+                    print(f"[{timestamp}] -> Port {str(result[1])} is open ({str(result[2])})")
                     openPorts.append([result[1], result[2]])
-                elif result[0] == 2:
-                    print("The port " + str(result[1]) + " is closed (" + str(result[2]) + ")")
-                elif result[0] == 3:
-                    print("The port " + str(result[1]) + " is filtered (" + str(result[2]) + ")")
-        save_result(ip, openPorts, filteredPorts, ports, (time.time() - start_time))
+                elif flag == 3:
+                    print(f"[{timestamp}] -> Port {str(result[1])} is filtered ({str(result[2])})")
+                    filteredPorts.append([result[1], result[2]])
+                elif flag == 4:
+                    print(f"[{timestamp}] -> ICMP packet responded or filtered")
+                    icmpResponse.append(result[1])
+        save_result(ip, openPorts, filteredPorts, icmpResponse, ports, start_time, (time.time() - start_time))
     except Exception as ex:
-        print("Can't scan the ports using socket")
+        print("Can't scan the port using scapy")
         if hasattr(ex, 'message'):
             print(ex.message)
         else:
