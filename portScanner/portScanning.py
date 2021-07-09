@@ -3,14 +3,7 @@ from datetime import datetime, timedelta
 from scapy.all import sr1, IP, TCP, RandShort
 
 ''' todo 
-    - finding blocked/filtered port [x]
-    - find the service that's for that port [x]
-    - save result into file [x]
-    - get OS detail
-    - check if the machine is reachable [x]
-    - support scan for common ports in get port options [x]
-    - print result file content after finish [x]
-    - refactor
+    
 
 '''
 
