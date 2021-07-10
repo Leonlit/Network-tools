@@ -103,14 +103,17 @@ def get_ip_address():
 def get_port_range():
     while True:
         print("Please enter the range of ports you want to scan in separated by dash, 1000-1200 (Between " + str(PORT_LIMITS[0]) + " and " + str(PORT_LIMITS[1]) + ")")
-        ports = input("Enter the port range that you want to scan: ")
-        ports_valid = PORT_REGEX.search(ports.replace(" ",""))
-        if ports_valid:
-            portRange = ports.split("-")
-            if portRange[0] > portRange[1]:
-                print("The minimum port can't be higher than maximum port number!")
-            return [int(ports_valid.group(1)), int(ports_valid.group(2)) + 1]
-        print("Invalid port range, please try again!")
+        try:
+            ports = input("Enter the port range that you want to scan: ")
+            ports_valid = PORT_REGEX.search(ports.replace(" ",""))
+            if ports_valid:
+                portRange = ports.split("-")
+                if portRange[0] > portRange[1]:
+                    print("The minimum port can't be higher than maximum port number!")
+                return [int(ports_valid.group(1)), int(ports_valid.group(2)) + 1]
+        except Exception as ex:
+            print(ex.message)
+        print("Invalid port number, please try again!")
 
 # return - port range in array
 #           0 - minimum port number
@@ -118,28 +121,34 @@ def get_port_range():
 def get_max_port():
     while True:
         print("Please enter the port that you want the program to scan to from 0 (zero), example: 22 (max is " + str(PORT_LIMITS[1]) + ")")
-        ports = input("Enter the port to scan until: ")
-        ports = ports.replace(" ","")
-        if ports != "" and isinstance(int(ports), int):
-            ports = int(ports)
-            ports_valid = int(ports) in range(PORT_LIMITS[0], PORT_LIMITS[1] + 1)
-            if ports_valid:
-                return [0, int(ports) + 1]
-            print("Invalid port number, please try again!")
+        try:
+            ports = input("Enter the port to scan until: ")
+            ports = ports.replace(" ","")
+            if ports != "" and isinstance(int(ports), int):
+                ports = int(ports)
+                ports_valid = int(ports) in range(PORT_LIMITS[0], PORT_LIMITS[1] + 1)
+                if ports_valid:
+                    return [0, int(ports) + 1]
+        except Exception as ex:
+            print(ex.message)
+        print("Invalid port number, please try again!")
 
 # return - port range in array
 #           0 - minimum port number
 #           1 - maximum port number to scan (plus 1 as later on I'll use the range function for loops)
 def get_single_port():
     while True:
-        print("Please enter a single port that you want the program to scan (inclusion), example: 22 (choose between " + str(PORT_LIMITS[0]) + " is " + str(PORT_LIMITS[1]) + ")")
-        port = input("Enter the port that you want to scan: ")
-        port = port.replace(" ", "")
-        if port !="" and isinstance(int(port), int):
-            port = int(port)
-            port_valid = int(port) in range(PORT_LIMITS[0], PORT_LIMITS[1])
-            if port_valid:
-                return [int(port), int(port) + 1]
+        print("Please enter a single port that you want the program to scan, example: 22 (choose between " + str(PORT_LIMITS[0]) + " is " + str(PORT_LIMITS[1]) + ")")
+        try:
+            port = input("Enter the port that you want to scan: ")
+            port = port.replace(" ", "")
+            if port !="" and isinstance(int(port), int):
+                port = int(port)
+                port_valid = int(port) in range(PORT_LIMITS[0], PORT_LIMITS[1])
+                if port_valid:
+                    return [int(port), int(port) + 1]
+        except Exception as ex:
+            print(ex.message)
         print("Invalid port number, please try again!")
 
 # return - port range in array
@@ -240,7 +249,7 @@ def save_result(ip, opens, filtered, scanRange, startTime, timeTaken):
     if directoryExists:
         range = str(scanRange[0]) + "-" + str(scanRange[1] - 1)
         if abs(scanRange[1] - scanRange[0]) == 1:
-            range = scanRange[0]
+            range = str(scanRange[0])
         
         timeTakenFormatted = formatTime(str(timedelta(seconds=timeTaken)))
         startTimeFormatted = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.localtime(startTime))
