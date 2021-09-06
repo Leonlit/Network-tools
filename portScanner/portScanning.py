@@ -1,6 +1,6 @@
 import socket, re, concurrent.futures, sys, os, time, subprocess, platform
 from datetime import datetime, timedelta
-from scapy.all import sr1, IP, TCP, RandShort
+from scapy.all import sr1, IP, TCP, RandShort, ICMP
 
 ''' todo 
     
@@ -184,7 +184,7 @@ def get_ports():
 #            2 - serv, service name of the port is providing
 def connect_port(port):
     try:
-        pkt = sr1(IP(dst=target_ip)/TCP(sport=RandShort(), dport=port, flags="S"), timeout=1, verbose=0)
+        pkt = sr1(IP(dst=target_ip)/TCP(sport=RandShort(), dport=port, flags="S"), timeout=2, verbose=0)
         if pkt != None:
             if pkt.haslayer(TCP):
                 serv = socket.getservbyport(port, "tcp")
@@ -192,12 +192,13 @@ def connect_port(port):
                     return [False]
                 elif pkt[TCP].flags == 18: # port open
                     return [2, port, serv]
+                elif (int(pkt.getlayer(ICMP).type)==3 and int(pkt.getlayer(ICMP).code) in [1,2,3,9,10,13]):
+                    return [3, port, serv]
             else: # unknown response
                 print(pkt.summary()) 
                 return [False]
         else:
-            serv = socket.getservbyport(port, "tcp")
-            return [3, port, serv]
+            return [False]
     except:
         return [False]
 
