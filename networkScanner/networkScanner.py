@@ -130,20 +130,23 @@ def scanNetwork(ipRange):
         print(ex)
         print(f"\nCould not scan the network: {ipRange}")
         print("Please re-run the program.\n")
-        exit()
-    finally:
-        sys.stdout = sys.__stdout__
-        fileObj.close()
-        fileContent = readFromFile(filename)
-        if fileContent:
-            updatedContent = addInfoIntoResult(filepath, fileContent)
-            for line in updatedContent:
-                print(line)
-            print(f"Updated content for {filename} with additional MAC address info")
-            print(f"\nSaved scan result for {ipRange} into {filename}\n")
-            print(f"Full path: {filepath}")
-        else:
-            print(f"Could not update the data from {filepath}")
+        return
+    
+    if not scans:
+        print("No Device found on the network")
+        return
+    sys.stdout = sys.__stdout__
+    fileObj.close()
+    fileContent = readFromFile(filename)
+    if fileContent:
+        updatedContent = addInfoIntoResult(filepath, fileContent)
+        for line in updatedContent:
+            print(line)
+        print(f"Updated content for {filename} with additional MAC address info")
+        print(f"\nSaved scan result for {ipRange} into {filename}\n")
+        print(f"Full path: {filepath}")
+    else:
+        print(f"Could not update the data from {filepath}")
 
 def main():
     banner()
