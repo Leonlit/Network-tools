@@ -1,6 +1,6 @@
 import socket, re, concurrent.futures, sys, os, time, subprocess, platform
 from datetime import datetime, timedelta
-from scapy.all import sr1, IP, TCP, RandShort, ICMP
+from scapy.all import sr1, sr, IP, TCP, RandShort, ICMP
 
 ''' todo 
     
@@ -77,10 +77,11 @@ def device_online(ip):
         return False
     if (result == 0):
         print(f"\nPing operation for [{ip}] is sucessful, target is online")
+        return True
     else:
         print(f"\nPing operation failed, the target might be offline or rejected connection from your device")
-        print("Or there's no device that's using this IP address currently")
-    return result == 0
+        print("Or there's no device that's using this IP address currently\n\n")
+        return False
 
 # return the target ip to scan, in string form
 def get_ip_address():
@@ -141,6 +142,7 @@ def get_single_port():
         print("Please enter a single port that you want the program to scan, example: 22 (choose between " + str(PORT_LIMITS[0]) + " is " + str(PORT_LIMITS[1]) + ")")
         try:
             port = input("Enter the port that you want to scan: ")
+            print("\n")
             port = port.replace(" ", "")
             if port !="" and isinstance(int(port), int):
                 port = int(port)
@@ -183,19 +185,21 @@ def get_ports():
 #            1 - port, integer number of port
 #            2 - serv, service name of the port is providing
 def connect_port(port):
+    src_port = RandShort()
     try:
-        pkt = sr1(IP(dst=target_ip)/TCP(sport=RandShort(), dport=port, flags="S"), timeout=2, verbose=0)
+        pkt = sr1(IP(dst=target_ip)/TCP(sport=src_port, dport=port, flags="S"), timeout=2, verbose=0)
         if pkt != None:
             if pkt.haslayer(TCP):
                 serv = socket.getservbyport(port, "tcp")
                 if pkt[TCP].flags == 20:    # port closed
                     return [False]
                 elif pkt[TCP].flags == 18: # port open
+                    send_rst = sr1(IP(dst=target_ip)/TCP(sport=src_port,dport=port,flags="AR"),timeout=3, verbose=0)
                     return [2, port, serv]
                 elif (int(pkt.getlayer(ICMP).type)==3 and int(pkt.getlayer(ICMP).code) in [1,2,3,9,10,13]):
                     return [3, port, serv]
             else: # unknown response
-                print(pkt.summary()) 
+                #print(pkt.summary()) 
                 return [False]
         else:
             return [False]
@@ -260,8 +264,8 @@ def save_result(ip, opens, filtered, scanRange, startTime, timeTaken):
                 file.write("Scan result for IP: " + ip +"\n")
                 file.write("Time of scan: " + startTimeFormatted + "\n")
                 file.write("Scan Range: " + range + "\n")
-                file.write(f"Time taken: {timeTakenFormatted}")
-                file.write(f"Number of available ports: ({len(opens) + len(filtered)})")
+                file.write(f"Time taken: {timeTakenFormatted} \n")
+                file.write(f"Number of available ports: ({len(opens) + len(filtered)})\n")
                 if len(opens) == len(filtered) == 0:
                     file.write("\n Nothing to be shown\n")
 
@@ -276,7 +280,7 @@ def save_result(ip, opens, filtered, scanRange, startTime, timeTaken):
                         file.write(str(index + 1) + ". \t" + str(port) + "\t(" + service + ")" +"\n")
 
                 file.close()
-                print(f"Saved scan result into {fileName}")
+                print(f"\nSaved scan result into:\n {fileName}")
                 display_result(fileName)
         except Exception as ex:
             print("Failed to write results into file specified")
