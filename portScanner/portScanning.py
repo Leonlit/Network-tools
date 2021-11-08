@@ -120,7 +120,7 @@ def display_result(fileName):
         print(file.read())
 
 # ip - string value of ip
-# opens, filtered:
+# opens, filtered, openfilteredPorts:
 #       - array
 #           0 - port number
 #           1 - service name
@@ -131,7 +131,7 @@ def display_result(fileName):
 # startTime - start time of the operations
 # timeTaken - time taken by the operations
 
-def save_result(ip, opens, filtered, scanRange, startTime, timeTaken):
+def save_result(ip, opens, filtered, openfilteredPorts, scanRange, startTime, timeTaken):
     directory = os.path.join(os.getcwd(), RESULT_DIRECTORY)
     directoryExists = make_directory(directory)
     if directoryExists:
@@ -148,13 +148,18 @@ def save_result(ip, opens, filtered, scanRange, startTime, timeTaken):
                 file.write("Time of scan: " + startTimeFormatted + "\n")
                 file.write("Scan Range: " + range + "\n")
                 file.write(f"Time taken: {timeTakenFormatted} \n")
-                file.write(f"Number of available ports: ({len(opens) + len(filtered)})\n")
-                if len(opens) == len(filtered) == 0:
+                file.write(f"Number of available ports: ({len(opens) + len(filtered) + len(openfilteredPorts)})\n")
+                if len(opens) == len(filtered) == len(openfilteredPorts) == 0:
                     file.write("\n Nothing to be shown\n")
 
                 if len(opens) != 0:
                     file.write("\n\nOpen ports:\n")
                     for index, [port, service] in enumerate(opens):
+                        file.write(str(index + 1) + ". \t" + str(port) + "\t(" + service + ")" +"\n")
+
+                if len(openfilteredPorts) != 0:
+                    file.write("\n\nOpen | Filtered ports:\n")
+                    for index, [port, service] in enumerate(openfilteredPorts):
                         file.write(str(index + 1) + ". \t" + str(port) + "\t(" + service + ")" +"\n")
                 
                 if len(filtered) != 0:
@@ -180,6 +185,7 @@ def scan_ports(ip, ports, scan_type):
     target_ip = ip
     openPorts = []
     filteredPorts = []
+    openfilteredPorts = []
 
     start_time = time.time()
     try:
@@ -193,8 +199,11 @@ def scan_ports(ip, ports, scan_type):
                 elif flag == 3:
                     print(f"[{timestamp}] -> Port {str(result[1])} is filtered ({str(result[2])})")
                     filteredPorts.append([result[1], result[2]])
+                elif flag == 4:
+                    print(f"[{timestamp}] -> Port {str(result[1])} is open | filtered ({str(result[2])})")
+                    openfilteredPorts.append([result[1], result[2]])
         
-        save_result(ip, openPorts, filteredPorts, ports, start_time, (time.time() - start_time))
+        save_result(ip, openPorts, filteredPorts, openfilteredPorts, ports, start_time, (time.time() - start_time))
     except Exception as ex:
         print("Can't scan the port using scapy")
         if hasattr(ex, 'message'):
