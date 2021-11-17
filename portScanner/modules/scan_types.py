@@ -63,7 +63,6 @@ def stealth_scan_port(port, target_ip):
 # return: array
 #            type:
 #               # False - closed
-#               # 2 - open
 #               # 3 - filtered
 #               # 4 - open | filtered
 #            1 - port, integer number of port
@@ -88,6 +87,34 @@ def xmas_scan_port(port, target_ip):
     except:
         return [False]
 
+# port - port number in integer form
+# return: array
+#            type:
+#               # False - closed
+#               # 3 - filtered
+#               # 4 - open | filtered
+#            1 - port, integer number of port
+#            2 - serv, service name of the port is providing
+def fin_scan(port, target_ip):
+    src_port = RandShort()
+    try:
+        pkt = sr1(IP(dst=target_ip)/TCP(sport=src_port, dport=port, flags="F"), timeout=2, verbose=0)
+        if pkt != None:
+            if pkt.haslayer(TCP):
+                serv = socket.getservbyport(port, "tcp")
+                if pkt[TCP].flags == 20:    # port closed
+                    return [False]
+                elif (int(pkt.getlayer(ICMP).type)==3 and int(pkt.getlayer(ICMP).code) in [1,2,3,9,10,13]):
+                    return [3, port, serv]
+            else: # unknown response
+                print(pkt.summary()) 
+                return [False]
+        else:
+            serv = socket.getservbyport(port, "tcp")
+            return [4, port, serv]
+    except:
+        return [False]
+
 def get_scan_type():
     thismodule = sys.modules[__name__]
     while True:
@@ -96,7 +123,7 @@ def get_scan_type():
         print(" 2. SYN scan")
         print(" 3. XMAS scan")
         print(" 4. FIN scan")
-        print(" 4. NULL scan")
+        print(" 5. NULL scan")
         print("")
         option = input ("Please choose one of them: ")
         option = option.replace(" ", "")
@@ -110,5 +137,5 @@ def get_scan_type():
                 elif option == 3:
                     return getattr(thismodule, 'xmas_scan_port')
                 elif option == 4:
-                    return [0, 1024]
+                    return getattr(thismodule, 'fin_scan')
         print("Invalid option, please try again!")
