@@ -115,6 +115,34 @@ def fin_scan(port, target_ip):
     except:
         return [False]
 
+# port - port number in integer form
+# return: array
+#            type:
+#               # False - closed
+#               # 3 - filtered
+#               # 4 - open | filtered
+#            1 - port, integer number of port
+#            2 - serv, service name of the port is providing
+def null_scan(port, target_ip):
+    src_port = RandShort()
+    try:
+        pkt = sr1(IP(dst=target_ip)/TCP(sport=src_port, dport=port, flags=""), timeout=2, verbose=0)
+        if pkt != None:
+            if pkt.haslayer(TCP):
+                serv = socket.getservbyport(port, "tcp")
+                if pkt[TCP].flags == 20:    # port closed
+                    return [False]
+                elif (int(pkt.getlayer(ICMP).type)==3 and int(pkt.getlayer(ICMP).code) in [1,2,3,9,10,13]):
+                    return [3, port, serv]
+            else: # unknown response
+                print(pkt.summary()) 
+                return [False]
+        else:
+            serv = socket.getservbyport(port, "tcp")
+            return [4, port, serv]
+    except:
+        return [False]
+
 def get_scan_type():
     thismodule = sys.modules[__name__]
     while True:
@@ -138,4 +166,6 @@ def get_scan_type():
                     return getattr(thismodule, 'xmas_scan_port')
                 elif option == 4:
                     return getattr(thismodule, 'fin_scan')
+                elif option == 5:
+                    return getattr(thismodule, 'null_scan')
         print("Invalid option, please try again!")
