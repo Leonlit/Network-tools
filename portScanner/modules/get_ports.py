@@ -81,5 +81,5 @@ def get_ports():
                 elif option == 3:
                     return get_single_port()
                 elif option == 4:
-                    return [0, 1024]
+                    return [1, 1024]
         print("Invalid option, please try again!")
