@@ -58,6 +58,17 @@ def get_single_port():
             print(ex.message)
         print("Invalid port number, please try again!")
 
+
+def parse_port_option(option):
+    if option == 1:
+        return get_port_range()
+    elif option == 2:
+        return get_max_port()
+    elif option == 3:
+        return get_single_port()
+    elif option == 4:
+        return [0, 1024]
+
 # return - port range in array
 #           0 - minimum port number
 #           1 - maximum port number to scan (plus 1 as later on I'll use the range function for loops)
@@ -74,12 +85,5 @@ def get_ports():
         if option !="" and isinstance(int(option), int):
             option = int(option)
             if (0 < int(option) < 5):
-                if option == 1:
-                    return get_port_range()
-                elif option == 2:
-                    return get_max_port()
-                elif option == 3:
-                    return get_single_port()
-                elif option == 4:
-                    return [0, 1024]
+                return parse_port_option(option)
         print("Invalid option, please try again!")

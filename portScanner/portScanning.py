@@ -46,15 +46,25 @@ def banner():
 def main():
     '''
     banner()
-    ip = utils.get_ip_address()
-    scan_type = scan_types.get_scan_type()
-    ports = get_ports.get_ports()
-    workers_num = utils.get_workers_num()
-    utils.scan_ports(ip, ports, scan_type, workers_num)
+    
     '''
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--interactive', nargs='?', const=1, type=int)
+    parser.add_argument('-i', '--interactive', nargs='?', type=int, const=True)
+    parser.add_argument('-ip', '--ip-address', nargs='?', type=str)
+    parser.add_argument('-s', '--scan-type', nargs='?', type=int, default=1)
+    parser.add_argument('-t', '--threads', nargs='?', type=int, default=3)
+    parser.add_argument('-p', '--port', nargs='?', type=int, default=4)
+    args = parser.parse_args()
+    print(args)
+    if args.interactive:
+        ip = utils.get_ip_address()
+        scan_type = scan_types.get_scan_type()
+        ports = get_ports.get_ports()
+        workers_num = utils.get_workers_num()
+        utils.scan_ports(ip, ports, scan_type, workers_num)
+    else:
+        utils.scan_ports(args.ip, get_ports.parse_port_option(args.ports), scan_type, workers_num)
 
 if __name__ == "__main__":
     try:
