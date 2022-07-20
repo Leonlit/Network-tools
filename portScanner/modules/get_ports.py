@@ -60,19 +60,21 @@ def get_single_port():
 
 
 def parse_port_option(option):
-    if option == 1:
-        return get_port_range()
-    elif option == 2:
-        return get_max_port()
-    elif option == 3:
-        return get_single_port()
-    elif option == 4:
-        return [0, 1024]
+    if (0 < option < 5):
+        if option == 1:
+            return get_port_range()
+        elif option == 2:
+            return get_max_port()
+        elif option == 3:
+            return get_single_port()
+        elif option == 4:
+            return [0, 1024]
+    return False
 
 # return - port range in array
 #           0 - minimum port number
 #           1 - maximum port number to scan (plus 1 as later on I'll use the range function for loops)
-def get_ports():
+def get_ports(terminal_option=0):
     while True:
         print("\nPlease choose an option for the type of port to be scanned")
         print(" 1. Port range")
@@ -80,10 +82,11 @@ def get_ports():
         print(" 3. Scan single port")
         print(" 4. Scan common ports (0 - 1023 ports)")
         print("")
-        option = input ("Please choose one of them: ")
-        option = option.replace(" ", "")
+        option = input("Please choose one of them: ")
+        option = option.strip()
         if option !="" and isinstance(int(option), int):
             option = int(option)
-            if (0 < int(option) < 5):
-                return parse_port_option(option)
+            result = parse_port_option(option)
+            if result:
+                return result
         print("Invalid option, please try again!")

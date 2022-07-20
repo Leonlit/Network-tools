@@ -174,13 +174,12 @@ def scan_ports(ip, ports, scan_type, workers_num):
 
 def get_workers_num():
     while True:
-        ip = input("Please enter the number of threads to use in the scanning: ")
-        if ip == "exit":
+        worker = input("Please enter the number of threads to use in the scanning: ")
+        if worker == "exit":
             print("Exiting program")
             exit()
-        ip = ip.replace(" ", "")
-        if ip.isdigit():
-            device_online(ip)
-            return ip
+        worker = worker.strip()
+        if worker.isdigit():
+            return int(worker)
         print("Invalid number value")
         print("Use only digits like 123, 321, 23, 3, etc")

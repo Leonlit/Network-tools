@@ -143,8 +143,23 @@ def null_scan(port, target_ip):
     except:
         return [False]
 
+def parse_scan_type(option):
+    if (0 < option < 5):
+        thismodule = sys.modules[__name__]
+        if option == 1:
+            return getattr(thismodule, 'tcp_scan_port')
+        elif option == 2:
+            return getattr(thismodule, 'stealth_scan_port')
+        elif option == 3:
+            return getattr(thismodule, 'xmas_scan_port')
+        elif option == 4:
+            return getattr(thismodule, 'fin_scan')
+        elif option == 5:
+            return getattr(thismodule, 'null_scan')
+    return False
+
 def get_scan_type():
-    thismodule = sys.modules[__name__]
+    
     while True:
         print("\nPlease choose which scan to perform onto the target")
         print(" 1. TCP scan")
@@ -157,15 +172,8 @@ def get_scan_type():
         option = option.replace(" ", "")
         if option !="" and isinstance(int(option), int):
             option = int(option)
-            if (0 < int(option) < 5):
-                if option == 1:
-                    return getattr(thismodule, 'tcp_scan_port')
-                elif option == 2:
-                    return getattr(thismodule, 'stealth_scan_port')
-                elif option == 3:
-                    return getattr(thismodule, 'xmas_scan_port')
-                elif option == 4:
-                    return getattr(thismodule, 'fin_scan')
-                elif option == 5:
-                    return getattr(thismodule, 'null_scan')
+            result = parse_scan_type(option)
+            if result:
+                return result
+                
         print("Invalid option, please try again!")

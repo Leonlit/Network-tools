@@ -1,7 +1,9 @@
+from ast import parse
 import sys, os, argparse
 import modules.scan_types as scan_types
 import modules.get_ports as get_ports
 import modules.utils as utils
+from argparse import RawTextHelpFormatter
 
 '''
 Copyright © 2021 LeonLit
@@ -44,27 +46,37 @@ def banner():
 
 
 def main():
-    '''
-    banner()
     
+
+    port_type_help = '''Which port option to scan\n
+ 1. x-y to scan from port x until y (including x and y).
+ 2. x to scan from port 0 to x.
+ 3. x to scan only port x
+ 4. Scan common ports (0 - 1023 ports) [default]
     '''
-    
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--interactive', nargs='?', type=int, const=True)
-    parser.add_argument('-ip', '--ip-address', nargs='?', type=str)
-    parser.add_argument('-s', '--scan-type', nargs='?', type=int, default=1)
-    parser.add_argument('-t', '--threads', nargs='?', type=int, default=3)
-    parser.add_argument('-p', '--port', nargs='?', type=int, default=4)
+
+    parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('-i', '--interactive', nargs='?', type=int, const=True, help="Enable interactive mode.")
+    group.add_argument('-ip', '--ip-address', nargs='?', type=str, help="Specify the ip address to scan ports.\n")
+    parser.add_argument('-s', '--scan-type', nargs='?', type=int, default=1, help="Select the type of scan to use\n 1. TCP scan\n 2. SYN scan\n 3. XMAS scan\n 4. FIN scan\n 5. NULL scan\n Default: TCP scan.\n")
+    parser.add_argument('-t', '--threads', nargs='?', type=int, default=3, help="Number of threads to use in scanning the device(s).\n Default: 3 workers\n")
+    parser.add_argument('-p', '--port', nargs='?', type=int, default=4, help=port_type_help)
     args = parser.parse_args()
-    print(args)
     if args.interactive:
+        banner()
         ip = utils.get_ip_address()
         scan_type = scan_types.get_scan_type()
         ports = get_ports.get_ports()
         workers_num = utils.get_workers_num()
         utils.scan_ports(ip, ports, scan_type, workers_num)
     else:
-        utils.scan_ports(args.ip, get_ports.parse_port_option(args.ports), scan_type, workers_num)
+        if hasattr(args, "ip_address"):
+            banner()
+            utils.scan_ports(args.ip_address, get_ports.parse_port_option(args.port), scan_types.parse_scan_type(args.scan_type), args.threads)
+        else:
+            print("\nError: Not enabling Interactive mode (-i), -ip/--ip-address option is required!!!\n")
+            parser.print_help()
 
 if __name__ == "__main__":
     try:
