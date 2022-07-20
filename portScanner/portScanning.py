@@ -57,13 +57,14 @@ def main():
 
     parser = argparse.ArgumentParser(formatter_class=RawTextHelpFormatter)
     group = parser.add_mutually_exclusive_group()
-    group.add_argument('-i', '--interactive', nargs='?', type=int, const=True, help="Enable interactive mode.")
+    group.add_argument('-i', '--interactive', nargs='?', type=int, help="Enable interactive mode.")
     group.add_argument('-ip', '--ip-address', nargs='?', type=str, help="Specify the ip address to scan ports.\n")
     parser.add_argument('-s', '--scan-type', nargs='?', type=int, default=1, help="Select the type of scan to use\n 1. TCP scan\n 2. SYN scan\n 3. XMAS scan\n 4. FIN scan\n 5. NULL scan\n Default: TCP scan.\n")
     parser.add_argument('-t', '--threads', nargs='?', type=int, default=3, help="Number of threads to use in scanning the device(s).\n Default: 3 workers\n")
     parser.add_argument('-p', '--port', nargs='?', type=int, default=4, help=port_type_help)
     args = parser.parse_args()
-    if args.interactive:
+
+    if args.interactive is not None:
         banner()
         ip = utils.get_ip_address()
         scan_type = scan_types.get_scan_type()
@@ -71,7 +72,7 @@ def main():
         workers_num = utils.get_workers_num()
         utils.scan_ports(ip, ports, scan_type, workers_num)
     else:
-        if hasattr(args, "ip_address"):
+        if args.ip_address is not None:
             banner()
             utils.scan_ports(args.ip_address, get_ports.parse_port_option(args.port), scan_types.parse_scan_type(args.scan_type), args.threads)
         else:
